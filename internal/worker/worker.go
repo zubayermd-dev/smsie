@@ -19,6 +19,7 @@ import (
 	"github.com/warthog618/sms"
 	"github.com/warthog618/sms/encoding/tpdu"
 	"go.bug.st/serial"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -564,7 +565,9 @@ func (w *ModemWorker) isURC(line string) bool {
 }
 
 func (w *ModemWorker) handleURC(line string) {
-	logger.Log.Infof("[%s] URC: %s", w.PortName, line)
+	if shouldLogURC() {
+		logger.Log.Debugf("[%s] URC: %s", w.PortName, line)
+	}
 	if strings.HasPrefix(line, "+CMTI:") {
 		// Trigger immediate scan
 		select {
@@ -577,16 +580,17 @@ func (w *ModemWorker) handleURC(line string) {
 	}
 
 	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "+CREG:") {
-		if code, text, err := parseCREGStatus(line); err == nil {
-			if w.modem == nil {
-				logger.Log.Debugf("[%s] Ignore CREG URC before modem init: %s", w.PortName, line)
-			} else {
-				w.modem.Registration = text
-				if code != "1" && code != "5" {
-					w.modem.Operator = ""
-				}
-				w.modem.LastSeen = time.Now()
+		code, text, err := parseCREGStatus(line)
+		if err != nil {
+			logger.Log.Warnf("[%s] Failed to parse CREG URC: %q: %v", w.PortName, line, err)
+		} else if w.modem == nil {
+			logger.Log.Debugf("[%s] Ignore CREG URC before modem init: %s", w.PortName, line)
+		} else {
+			w.modem.Registration = text
+			if code != "1" && code != "5" {
+				w.modem.Operator = ""
 			}
+			w.modem.LastSeen = time.Now()
 		}
 	}
 
@@ -635,12 +639,20 @@ func (w *ModemWorker) handleCallURC(line string) {
 	case strings.HasPrefix(upper, "+CLCC:"):
 		if info, ok := parseCLCCState(line); ok {
 			w.applyCLCCState(info, "clcc")
+		} else {
+			logger.Log.Warnf("[%s] Failed to parse CLCC URC: %q", w.PortName, line)
 		}
 	case isCCInfoQIND(line):
 		if info, ok := parseCCInfoState(line); ok {
 			w.applyCLCCState(info, "ccinfo")
+		} else {
+			logger.Log.Warnf("[%s] Failed to parse ccinfo URC: %q", w.PortName, line)
 		}
 	}
+}
+
+func shouldLogURC() bool {
+	return logger.Log != nil && logger.Log.Desugar().Core().Enabled(zap.DebugLevel)
 }
 
 type clccDetails struct {

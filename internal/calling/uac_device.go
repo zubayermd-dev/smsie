@@ -36,6 +36,7 @@ func pickUACAudioDevice(cfg AudioConfig, target ModemTarget) (*uacAudioDevice, e
 	}
 
 	targetHints := map[string]struct{}{}
+	alsaHints := map[string]struct{}{}
 	addHint := func(v string) {
 		n := normalize(v)
 		if n == "" {
@@ -43,10 +44,18 @@ func pickUACAudioDevice(cfg AudioConfig, target ModemTarget) (*uacAudioDevice, e
 		}
 		targetHints[n] = struct{}{}
 	}
+	addALSAHint := func(v string) {
+		n := normalize(v)
+		if n == "" {
+			return
+		}
+		alsaHints[n] = struct{}{}
+		targetHints[n] = struct{}{}
+	}
 	addHint(identity.VID)
 	addHint(identity.PID)
 	for _, h := range ResolveALSACardHintsFromPort(target) {
-		addHint(h)
+		addALSAHint(h)
 	}
 
 	hasTargetUSBAudio := false
@@ -67,6 +76,15 @@ func pickUACAudioDevice(cfg AudioConfig, target ModemTarget) (*uacAudioDevice, e
 		return false
 	}
 
+	hasALSAHint := func(name string) bool {
+		for hint := range alsaHints {
+			if strings.Contains(name, hint) {
+				return true
+			}
+		}
+		return false
+	}
+
 	hasGenericUSBHint := func(name string) bool {
 		return strings.Contains(name, "usb") || strings.Contains(name, "ac interface") || strings.Contains(name, "android")
 	}
@@ -74,6 +92,9 @@ func pickUACAudioDevice(cfg AudioConfig, target ModemTarget) (*uacAudioDevice, e
 	deviceScore := func(name string) int {
 		score := 0
 
+		if hasALSAHint(name) {
+			score += 600
+		}
 		if hasAnyTargetHint(name) {
 			score += 220
 		}
@@ -147,6 +168,16 @@ func pickUACAudioDevice(cfg AudioConfig, target ModemTarget) (*uacAudioDevice, e
 
 	var inDevice, outDevice *portaudio.DeviceInfo
 
+	if keyword != "" && len(alsaHints) > 0 {
+		inDevice, outDevice = findPair(func(name string) bool {
+			return strings.Contains(name, keyword) && hasALSAHint(name)
+		})
+	}
+	if (inDevice == nil || outDevice == nil) && len(alsaHints) > 0 {
+		inDevice, outDevice = findPair(func(name string) bool {
+			return hasALSAHint(name)
+		})
+	}
 	if keyword != "" && hasTargetUSBAudio {
 		inDevice, outDevice = findPair(func(name string) bool {
 			return strings.Contains(name, keyword) && hasAnyTargetHint(name)

@@ -168,7 +168,8 @@ Notes:
 - Browser frontend does not originate SIP calls directly. Browser `Call` always uses WebRTC/UAC. SIP origination is for backend/API integrations or VoIP server initiated calls to the modem listener.
 
 ## Enable UAC on modem
-- Send `AT+QCFG="usbcfg",0x2C7C,0x0125,1,1,1,1,1,1,1` in AT command terminal.
+- Send `AT+QCFG="usbcfg",0x2C7C,0x0125,1,1,1,1,1,1,1` to enable the UAC device in AT command terminal.
+- Send `AT+QPCMV=1,2` to enable UAC and forward PCM data via USB sound card.
 
 ## Enable VoLTE on modem
 ```
