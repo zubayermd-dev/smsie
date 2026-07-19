@@ -58,8 +58,10 @@ func (w *ModemWorker) poll() {
 		return
 	}
 	w.checkSignal()
-	// SMS is handled via URC (+CMTI) notifications, not polling
-	// Only poll SMS as fallback if URC mode is not enabled
+	// Only check SMS if this worker is the registered one for this ICCID
+	if w.manager.IsRegisteredWorker(w.PortName, w.getModem().ICCID) {
+		w.checkSMS()
+	}
 }
 
 func (w *ModemWorker) checkOperator() {
@@ -239,6 +241,7 @@ func (w *ModemWorker) checkSMS() {
 	lines := strings.Split(resp, "\n")
 	var currentPDU string
 	var currentIndex int
+	var newMessages int
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -259,7 +262,12 @@ func (w *ModemWorker) checkSMS() {
 			// Likely PDU
 			currentPDU = line
 			w.processPDUWithIndex(currentPDU, currentIndex)
+			newMessages++
 		}
+	}
+
+	if newMessages > 0 {
+		logger.Log.Infof("[%s] Processed %d new messages from SIM", w.PortName, newMessages)
 	}
 
 	// Delete all messages after reading to avoid filling memory

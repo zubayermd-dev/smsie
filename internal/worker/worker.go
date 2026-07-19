@@ -424,10 +424,18 @@ func (w *ModemWorker) initModem() {
 		}
 
 		// Deduplication Check
+		// If ICCID already registered, check if this port can receive SMS notifications
 		if !w.manager.RegisterICCID(w.PortName, iccid) {
-			logger.Log.Warnf("[%s] ICCID %s is already managed by another worker. Stopping duplicate.", w.PortName, iccid)
-			w.Stop() // This stops the worker loop
-			return
+			// Check if this port has CNMI set (can receive SMS notifications)
+			cnmiResp, cnmiErr := w.ExecuteAT("AT+CNMI?", 2*time.Second)
+			if cnmiErr == nil && strings.Contains(cnmiResp, "+CNMI:") {
+				// This port can receive notifications - keep it as secondary
+				logger.Log.Infof("[%s] Port %s has CNMI set, keeping as secondary SMS port", w.PortName, iccid)
+			} else {
+				logger.Log.Warnf("[%s] ICCID %s is already managed by another worker. Stopping duplicate.", w.PortName, iccid)
+				w.Stop()
+				return
+			}
 		}
 
 		logger.Log.Infof("[%s] Found ICCID: %s", w.PortName, iccid)
@@ -611,7 +619,8 @@ func (w *ModemWorker) handleURC(line string) {
 			idxStr := strings.TrimSpace(parts[len(parts)-1])
 			if idx, err := strconv.Atoi(idxStr); err == nil {
 				logger.Log.Infof("[%s] New SMS at index %d, reading...", w.PortName, idx)
-				w.readAndProcessSMS(idx)
+				// Run in goroutine to avoid deadlock with runLoop
+				go w.readAndProcessSMS(idx)
 				return
 			}
 		}

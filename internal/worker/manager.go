@@ -146,9 +146,16 @@ func (m *Manager) unregisterWorkerLocked(port string, w *ModemWorker) {
 		return
 	}
 
-	if w.modem != nil && w.modem.ICCID != "" {
-		delete(m.activeICCIDs, w.modem.ICCID)
+	if w.getModem() != nil && w.getModem().ICCID != "" {
+		delete(m.activeICCIDs, w.getModem().ICCID)
 	}
+}
+
+func (m *Manager) IsRegisteredWorker(port, iccid string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	registeredPort, ok := m.activeICCIDs[iccid]
+	return ok && registeredPort == port
 }
 
 func (m *Manager) RemoveWorkerByICCID(iccid string) bool {
