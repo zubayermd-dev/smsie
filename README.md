@@ -272,5 +272,5 @@ Ivy is an independent fork maintained separately from the original smsie project
 ---
 
 <p align="center">
-Made by **ZuboHQ**
+Made by **zubohq** for the open-source community.
 </p>
