@@ -197,13 +197,29 @@ curl -X POST http://localhost:8080/api/v1/modems/IMSI_XXXXXXXX/send \
 
 ## Supported Modems
 
-| Modem | SMS | Voice | Notes |
-|-------|-----|-------|-------|
-| Quectel EC20 | ✅ | ✅ | Full UAC support |
-| Quectel EC800M | ✅ | ✅ | Full UAC support |
-| OpenLuat Air780E | ✅ | ✅ | Full UAC support |
-| Huawei EG162G | ✅ | ❌ | EDGE modem, no UAC |
-| Huawei E161/E169 | ✅ | ❌ | HSDPA modem |
+Ivy works with **any GSM/LTE modem** that supports standard AT commands. The modem is auto-detected when plugged in — no configuration needed.
+
+### Tested Modems
+
+| Modem | SMS | Voice | Connection | Notes |
+|-------|-----|-------|------------|-------|
+| Quectel EC20 | ✅ | ✅ | LTE | Full UAC support |
+| Quectel EC800M | ✅ | ✅ | LTE | Full UAC support |
+| OpenLuat Air780E | ✅ | ✅ | LTE | Full UAC support |
+| Huawei EG162G | ✅ | ❌ | EDGE | 2.5G modem |
+| Huawei E161/E169 | ✅ | ❌ | HSDPA | 3.5G modem |
+
+### Compatibility
+
+Any modem that responds to these AT commands should work:
+- `AT` — Basic communication test
+- `AT+ICCID` or `AT^ICCID?` — SIM card identification
+- `AT+CSQ` — Signal quality
+- `AT+CMGF` — SMS mode (PDU/Text)
+- `AT+CMGS` — Send SMS
+- `AT+CMGL` — List SMS
+
+**Common compatible brands:** Quectel, Huawei, ZTE, SIMCom, Sierra Wireless, Teltonika, u-blox, OpenLuat, and most Chinese 4G/LTE modules (EC20, EC25, MC60, A7670, etc.).
 
 ---
 
