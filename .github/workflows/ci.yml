@@ -24,13 +24,13 @@ jobs:
 
       - name: Build UAC Linux amd64 Binary
         run: |
-          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -o smsie-linux-amd64 main.go
+          CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -o ivy-linux-amd64 main.go
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-uac-linux-amd64
-          path: smsie-linux-amd64
+          path: ivy-linux-amd64
 
   build-uac-linux-arm64:
     name: Build UAC Linux arm64 Binary
@@ -48,13 +48,13 @@ jobs:
             -v "${{ github.workspace }}:/src" \
             -w /src \
             golang:1.25-bookworm \
-            bash -lc 'export PATH=/usr/local/go/bin:$PATH && export GOTOOLCHAIN=auto && apt-get update && apt-get install -y --no-install-recommends portaudio19-dev libusb-1.0-0-dev ffmpeg pkg-config && CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -v -o smsie-linux-arm64 main.go'
+            bash -lc 'export PATH=/usr/local/go/bin:$PATH && export GOTOOLCHAIN=auto && apt-get update && apt-get install -y --no-install-recommends portaudio19-dev libusb-1.0-0-dev ffmpeg pkg-config && CGO_ENABLED=1 GOOS=linux GOARCH=arm64 go build -v -o ivy-linux-arm64 main.go'
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-uac-linux-arm64
-          path: smsie-linux-arm64
+          path: ivy-linux-arm64
 
   build-uac-linux-arm:
     name: Build UAC Linux arm Binary
@@ -72,13 +72,13 @@ jobs:
             -v "${{ github.workspace }}:/src" \
             -w /src \
             golang:1.25-bookworm \
-            bash -lc 'export PATH=/usr/local/go/bin:$PATH && export GOTOOLCHAIN=auto && apt-get update && apt-get install -y --no-install-recommends portaudio19-dev libusb-1.0-0-dev ffmpeg pkg-config && CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=7 go build -v -o smsie-linux-arm main.go'
+            bash -lc 'export PATH=/usr/local/go/bin:$PATH && export GOTOOLCHAIN=auto && apt-get update && apt-get install -y --no-install-recommends portaudio19-dev libusb-1.0-0-dev ffmpeg pkg-config && CGO_ENABLED=1 GOOS=linux GOARCH=arm GOARM=7 go build -v -o ivy-linux-arm main.go'
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-uac-linux-arm
-          path: smsie-linux-arm
+          path: ivy-linux-arm
 
   build-uac-windows:
     name: Build UAC Windows Binary
@@ -112,13 +112,13 @@ jobs:
           export CGO_ENABLED=1
           export CC=gcc
           export CXX=g++
-          go build -v -o smsie-windows-amd64.exe main.go
+          go build -v -o ivy-windows-amd64.exe main.go
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-uac-windows
-          path: smsie-windows-amd64.exe
+          path: ivy-windows-amd64.exe
 
   build-uac-container:
     name: Build UAC Container
@@ -189,29 +189,29 @@ jobs:
 
       - name: Build noUAC Linux amd64 Binary
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags nouac -v -o smsie-linux-amd64-nouac main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags nouac -v -o ivy-linux-amd64-nouac main.go
 
       - name: Build noUAC Linux arm64 Binary
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -tags nouac -v -o smsie-linux-arm64-nouac main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -tags nouac -v -o ivy-linux-arm64-nouac main.go
 
       - name: Build noUAC Linux arm Binary
         run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags nouac -v -o smsie-linux-arm-nouac main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build -tags nouac -v -o ivy-linux-arm-nouac main.go
 
       - name: Build noUAC Windows amd64 Binary
         run: |
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags nouac -v -o smsie-windows-amd64-nouac.exe main.go
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -tags nouac -v -o ivy-windows-amd64-nouac.exe main.go
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-nouac
           path: |
-            smsie-linux-amd64-nouac
-            smsie-linux-arm64-nouac
-            smsie-linux-arm-nouac
-            smsie-windows-amd64-nouac.exe
+            ivy-linux-amd64-nouac
+            ivy-linux-arm64-nouac
+            ivy-linux-arm-nouac
+            ivy-windows-amd64-nouac.exe
 
   build-nouac-container:
     name: Build noUAC Container
@@ -299,12 +299,12 @@ jobs:
 
           gh release upload "${TAG}" \
             --repo "${GH_REPO}" \
-            smsie-linux-amd64 \
-            smsie-linux-amd64-nouac \
-            smsie-linux-arm64 \
-            smsie-linux-arm64-nouac \
-            smsie-linux-arm \
-            smsie-linux-arm-nouac \
-            smsie-windows-amd64.exe \
-            smsie-windows-amd64-nouac.exe \
+            ivy-linux-amd64 \
+            ivy-linux-amd64-nouac \
+            ivy-linux-arm64 \
+            ivy-linux-arm64-nouac \
+            ivy-linux-arm \
+            ivy-linux-arm-nouac \
+            ivy-windows-amd64.exe \
+            ivy-windows-amd64-nouac.exe \
             --clobber
