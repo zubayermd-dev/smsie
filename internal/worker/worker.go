@@ -1175,6 +1175,23 @@ func (w *ModemWorker) SetOperator(oper string) error {
 	return err
 }
 
+// DeleteSMSFromSIM deletes an SMS from the SIM card by index
+func (w *ModemWorker) DeleteSMSFromSIM(simIndex int) error {
+	if w.getModem() == nil {
+		return errors.New("modem not initialized")
+	}
+	if simIndex <= 0 {
+		return nil // No SIM index to delete
+	}
+
+	w.SetBusy(true)
+	defer w.SetBusy(false)
+
+	cmd := fmt.Sprintf("AT+CMGD=%d", simIndex)
+	_, err := w.ExecuteAT(cmd, 5*time.Second)
+	return err
+}
+
 // SendSMS sends an SMS message using PDU format
 func (w *ModemWorker) SendSMS(phoneNumber, message string) error {
 	w.SetBusy(true)

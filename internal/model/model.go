@@ -80,6 +80,7 @@ type SMS struct {
 	Type      string    `gorm:"index" json:"type"` // sent, received
 	IsRead    bool      `gorm:"default:false" json:"is_read"`
 	RawPDU    string    `json:"raw_pdu,omitempty"` // For debugging
+	SimIndex  int       `gorm:"default:0" json:"sim_index,omitempty"` // SIM storage index for deletion
 	CreatedAt time.Time `json:"created_at"`
 }
 

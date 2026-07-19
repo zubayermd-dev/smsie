@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -191,27 +192,41 @@ func (w *ModemWorker) checkSMS() {
 
 	lines := strings.Split(resp, "\n")
 	var currentPDU string
+	var currentIndex int
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || line == "OK" {
 			continue
 		}
-		if !strings.HasPrefix(line, "+CMGL:") {
+		if strings.HasPrefix(line, "+CMGL:") {
+			// Extract index from +CMGL: <index>,<stat>,...
+			parts := strings.SplitN(line, ",", 2)
+			if len(parts) >= 1 {
+				idxStr := strings.TrimPrefix(parts[0], "+CMGL:")
+				idxStr = strings.TrimSpace(idxStr)
+				if idx, err := strconv.Atoi(idxStr); err == nil {
+					currentIndex = idx
+				}
+			}
+		} else {
 			// Likely PDU
 			currentPDU = line
-			w.processPDU(currentPDU)
+			w.processPDUWithIndex(currentPDU, currentIndex)
 		}
 	}
 
 	// Delete all messages after reading to avoid filling memory
-	// Warning: This deletes ALL messages. In production might want to delete by index.
 	if err := w.deleteReadMessages(lines); err != nil {
 		logger.Log.Warnf("[%s] Failed to delete messages: %v", w.PortName, err)
 	}
 }
 
 func (w *ModemWorker) processPDU(raw string) {
+	w.processPDUWithIndex(raw, 0)
+}
+
+func (w *ModemWorker) processPDUWithIndex(raw string, simIndex int) {
 	// Hex Decode
 	b, err := hex.DecodeString(raw)
 	if err != nil {
@@ -279,13 +294,14 @@ func (w *ModemWorker) processPDU(raw string) {
 	logger.Log.Infof("[%s] SMS From %s: %s", w.PortName, sender, content)
 
 	sms := &model.SMS{
-		ICCID:     w.modem.ICCID,
+		ICCID:     w.getModem().ICCID,
 		Phone:     sender,
 		Content:   content,
 		Timestamp: timestamp,
 		Type:      "received",
 		IsRead:    false,
 		RawPDU:    raw,
+		SimIndex:  simIndex,
 		CreatedAt: time.Now(),
 	}
 	if sms.Timestamp.IsZero() {

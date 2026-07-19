@@ -117,7 +117,7 @@ func main() {
 
 	// Setup Routes
 	mh := api.NewModemHandler(db, wm, callMgr)
-	sh := api.NewSMSHandler(db)
+	sh := api.NewSMSHandler(db, wm)
 	wh := api.NewWebhookHandler(db)
 	uh := api.NewUserHandler(db)
 	akh := api.NewAPIKeyHandler(db)

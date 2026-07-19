@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/zubayermd-dev/ivy/internal/worker"
 	"github.com/zubayermd-dev/ivy/pkg/logger"
 	"github.com/warthog618/sms/encoding/tpdu"
 	"log"
@@ -18,10 +19,11 @@ import (
 
 type SMSHandler struct {
 	db *gorm.DB
+	wm *worker.Manager
 }
 
-func NewSMSHandler(db *gorm.DB) *SMSHandler {
-	return &SMSHandler{db: db}
+func NewSMSHandler(db *gorm.DB, wm *worker.Manager) *SMSHandler {
+	return &SMSHandler{db: db, wm: wm}
 }
 
 func (h *SMSHandler) ListSMS(c *gin.Context) {
@@ -188,6 +190,16 @@ func (h *SMSHandler) DeleteSMS(c *gin.Context) {
 	if !isAdmin && actor.APIKey == nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Admin access required"})
 		return
+	}
+
+	// Delete from SIM card if index is available
+	if smsObj.SimIndex > 0 {
+		w := h.wm.GetWorkerByICCID(smsObj.ICCID)
+		if w != nil {
+			if err := w.DeleteSMSFromSIM(smsObj.SimIndex); err != nil {
+				logger.Log.Warnf("Failed to delete SMS from SIM: %v", err)
+			}
+		}
 	}
 
 	if err := h.db.Delete(&smsObj).Error; err != nil {
