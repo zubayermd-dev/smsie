@@ -48,19 +48,18 @@ func (w *ModemWorker) logicLoop() {
 }
 
 func (w *ModemWorker) poll() {
-	if w.modem == nil {
+	if w.getModem() == nil {
 		return
 	}
 	if w.IsBusy() {
-		// Skip polling if busy with manual command
 		return
 	}
 	if w.GetCallState().State != callStateIdle {
-		// Skip polling during dialing/in-call to avoid AT flow interference
 		return
 	}
 	w.checkSignal()
-	w.checkSMS()
+	// SMS is handled via URC (+CMTI) notifications, not polling
+	// Only poll SMS as fallback if URC mode is not enabled
 }
 
 func (w *ModemWorker) checkOperator() {
@@ -177,6 +176,53 @@ func parseCREGStatus(resp string) (string, string, error) {
 	default:
 		return stat, "Unknown", nil
 	}
+}
+
+// readAndProcessSMS reads a specific SMS by index and processes it
+func (w *ModemWorker) readAndProcessSMS(index int) {
+	w.SetBusy(true)
+	defer w.SetBusy(false)
+
+	// Read specific message by index
+	cmd := fmt.Sprintf("AT+CMGR=%d", index)
+	resp, err := w.ExecuteAT(cmd, 5*time.Second)
+	if err != nil {
+		logger.Log.Errorf("[%s] Failed CMGR at index %d: %v", w.PortName, index, err)
+		return
+	}
+
+	// Parse the response - format is +CMGR: <stat>,<oa>,<scts> then PDU
+	lines := strings.Split(resp, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "+CMGR:") {
+			// Next line should be the PDU
+			continue
+		}
+		if line == "" || line == "OK" {
+			continue
+		}
+		// This line is the PDU
+		if len(line) > 20 && isHexString(line) {
+			w.processPDUWithIndex(line, index)
+			break
+		}
+	}
+
+	// Delete the message from SIM after processing
+	delCmd := fmt.Sprintf("AT+CMGD=%d", index)
+	if _, err := w.ExecuteAT(delCmd, 5*time.Second); err != nil {
+		logger.Log.Warnf("[%s] Failed to delete SMS at index %d: %v", w.PortName, index, err)
+	}
+}
+
+func isHexString(s string) bool {
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 func (w *ModemWorker) checkSMS() {

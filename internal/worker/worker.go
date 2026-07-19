@@ -605,12 +605,20 @@ func (w *ModemWorker) handleURC(line string) {
 		logger.Log.Debugf("[%s] URC: %s", w.PortName, line)
 	}
 	if strings.HasPrefix(line, "+CMTI:") {
-		// Trigger immediate scan
+		// Extract index from +CMTI: "SM",3
+		parts := strings.Split(line, ",")
+		if len(parts) >= 2 {
+			idxStr := strings.TrimSpace(parts[len(parts)-1])
+			if idx, err := strconv.Atoi(idxStr); err == nil {
+				logger.Log.Infof("[%s] New SMS at index %d, reading...", w.PortName, idx)
+				w.readAndProcessSMS(idx)
+				return
+			}
+		}
+		// Fallback: trigger full scan if index extraction fails
 		select {
 		case w.triggerChan <- struct{}{}:
-			logger.Log.Debugf("[%s] Triggered immediate SMS scan", w.PortName)
 		default:
-			// Already triggered
 		}
 		return
 	}
