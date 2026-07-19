@@ -21,8 +21,8 @@ func NewSMSRepository(db *gorm.DB) *SMSRepository {
 func (r *SMSRepository) Create(sms *model.SMS) error {
 	// Deduplication in a transaction to prevent race conditions
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		// Check for duplicate within 5 minutes (carrier may resend same SMS)
-		since := time.Now().Add(-5 * time.Minute)
+		// Check for duplicate within 10 minutes (carrier may resend same SMS)
+		since := time.Now().Add(-10 * time.Minute)
 		var count int64
 		tx.Model(&model.SMS{}).
 			Where("phone = ? AND content = ? AND created_at > ?",
