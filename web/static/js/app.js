@@ -391,7 +391,7 @@ $(document).ready(function () {
         if (!confirm(`Delete all messages from ${phone}?`)) return;
 
         $.ajax({
-            url: `/api/v1/sms/phone/${encodeURIComponent(phone)}`,
+            url: `/api/v1/sms/phone?phone=${encodeURIComponent(phone)}`,
             type: 'DELETE',
             headers: { 'Authorization': 'Bearer ' + auth.token },
             success: function() {
