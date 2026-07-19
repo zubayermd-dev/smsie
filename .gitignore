@@ -12,6 +12,8 @@ smsie_new
 
 # Config with secrets
 config.yaml
+.env
+.initial_admin_password
 
 # System
 .DS_Store
