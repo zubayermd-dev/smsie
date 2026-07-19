@@ -2,6 +2,18 @@
 
 let i18nCache = {};
 
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Default Language logic
 let storedLang = localStorage.getItem('sms_lang');
 let currentLang = storedLang ? storedLang : 'zh-tw'; // Default to zh-tw per user request
@@ -325,24 +337,100 @@ $(document).ready(function () {
 
     $('#btn-refresh-sms').click(() => loadSMS(1));
     $('#sms-filter-modem').change(() => loadSMS(1));
+    $('#sms-filter-type').change(() => loadSMS(1));
+    $('#sms-search').on('input', debounce(() => loadSMS(1), 300));
     $('#btn-create-apikey').click(createAPIKey);
     $('#btn-refresh-apikeys').click(loadAPIKeys);
     $('#btn-copy-apikey').click(copyLatestAPIKeySecret);
 
-    // User Mgmt
-    $('#btn-save-user').click(saveUser);
+    // Compose SMS
+    $('#btn-compose-sms').click(function() {
+        // Populate modem dropdown
+        const select = $('#compose-modem');
+        select.empty();
+        $.get('/api/v1/modems', function(modems) {
+            modems.forEach(m => {
+                if (m.status === 'online') {
+                    select.append($('<option>').val(m.iccid).text(`${m.operator || m.iccid} (${m.iccid})`));
+                }
+            });
+            if (select.children().length === 0) {
+                select.append($('<option>').val('').text('No online modems'));
+            }
+        });
+        $('#compose-phone').val('');
+        $('#compose-message').val('');
+        $('#compose-char-count').text('0');
+        $('#compose-status').text('');
+        new bootstrap.Modal('#composeModal').show();
+    });
 
-    // Auto Refresh SMS
-    setInterval(() => {
-        if (!$('#view-sms').hasClass('d-none') && auth.username) {
-            // Only refresh if on first page to allow reading logs without jumps?
-            // User requested pagination. Usually auto-refresh interrupts pagination.
-            // Let's only auto-refresh if on page 1.
-            if (currentSMSPage === 1) {
-                loadSMS(1);
+    $('#compose-message').on('input', function() {
+        $('#compose-char-count').text($(this).val().length);
+    });
+
+    $('#btn-compose-send').click(function() {
+        const iccid = $('#compose-modem').val();
+        const phone = $('#compose-phone').val().trim();
+        const message = $('#compose-message').val().trim();
+
+        if (!iccid) {
+            $('#compose-status').html('<span class="text-danger">Select a modem</span>');
+            return;
+        }
+        if (!phone) {
+            $('#compose-status').html('<span class="text-danger">Enter phone number</span>');
+            return;
+        }
+        if (!message) {
+            $('#compose-status').html('<span class="text-danger">Enter message</span>');
+            return;
+        }
+
+        const btn = $(this);
+        btn.prop('disabled', true).html('<span class="spinner-border spinner-border-sm"></span> Sending...');
+        $('#compose-status').text('');
+
+        $.ajax({
+            url: `/api/v1/modems/${iccid}/send`,
+            type: 'POST',
+            contentType: 'application/json',
+            headers: { 'Authorization': 'Bearer ' + auth.token },
+            data: JSON.stringify({ phone: phone, message: message }),
+            success: function() {
+                $('#compose-status').html('<span class="text-success">SMS sent!</span>');
+                btn.prop('disabled', false).html('<i class="bi bi-send"></i> Send');
+                setTimeout(() => {
+                    bootstrap.Modal.getInstance('#composeModal').hide();
+                    loadSMS(1);
+                }, 1000);
+            },
+            error: function(xhr) {
+                const msg = xhr.responseJSON?.error || 'Send failed';
+                $('#compose-status').html(`<span class="text-danger">${msg}</span>`);
+                btn.prop('disabled', false).html('<i class="bi bi-send"></i> Send');
+            }
+        });
+    });
+
+    // Auto-refresh toggle
+    $('#sms-auto-refresh').change(function() {
+        if ($(this).is(':checked')) {
+            smsAutoRefreshInterval = setInterval(() => {
+                if (!$('#view-sms').hasClass('d-none') && auth.username && currentSMSPage === 1) {
+                    loadSMS(1);
+                }
+            }, 5000);
+        } else {
+            if (smsAutoRefreshInterval) {
+                clearInterval(smsAutoRefreshInterval);
+                smsAutoRefreshInterval = null;
             }
         }
-    }, 10000);
+    });
+
+    // User Mgmt
+    $('#btn-save-user').click(saveUser);
 
     // AT Terminal Logic
     $('#btn-send-at').click(function () {
@@ -455,22 +543,42 @@ function doLogin() {
 }
 
 const SMS_LIMIT = 20;
+let smsAutoRefreshInterval = null;
 
 function loadSMS(page = 1) {
     currentSMSPage = page;
     const iccid = $('#sms-filter-modem').val();
+    const typeFilter = $('#sms-filter-type').val();
+    const searchTerm = $('#sms-search').val().trim();
 
-    $.get('/api/v1/sms', { iccid: iccid, page: page, limit: SMS_LIMIT }, function (resp) {
+    $.get('/api/v1/sms', { iccid: iccid, page: page, limit: 100 }, function (resp) {
         const list = $('#sms-list');
         list.empty();
 
-        const data = resp.data || [];
-        const total = resp.total || 0;
+        let data = resp.data || [];
+        const totalAll = resp.total || 0;
 
-        if (data.length === 0) {
+        // Client-side filtering for type
+        if (typeFilter) {
+            data = data.filter(sms => sms.type === typeFilter);
+        }
+
+        // Client-side search
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            data = data.filter(sms =>
+                (sms.phone || '').toLowerCase().includes(term) ||
+                (sms.content || '').toLowerCase().includes(term)
+            );
+        }
+
+        const total = data.length;
+        const pagedData = data.slice((page - 1) * SMS_LIMIT, page * SMS_LIMIT);
+
+        if (pagedData.length === 0) {
             list.append('<div class="text-center text-muted p-3">No messages</div>');
         } else {
-            data.forEach(sms => {
+            pagedData.forEach(sms => {
                 const time = new Date(sms.timestamp).toLocaleString();
                 const isSent = sms.type === 'sent';
                 const badgeClass = isSent ? 'sms-badge-sent' : 'sms-badge-received';
