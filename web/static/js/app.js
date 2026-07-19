@@ -472,20 +472,46 @@ function loadSMS(page = 1) {
         } else {
             data.forEach(sms => {
                 const time = new Date(sms.timestamp).toLocaleString();
-                // XSS Protection: Create text node or use .text() 
-                // constructing purely via string is risky if content is user input.
-                // We will use a safe builder approach.
+                const isSent = sms.type === 'sent';
+                const badgeClass = isSent ? 'sms-badge-sent' : 'sms-badge-received';
+                const badgeText = isSent ? 'Sent' : 'Received';
+                const icon = isSent ? 'bi-arrow-up-right' : 'bi-arrow-down-left';
 
                 const div = $('<div>').addClass('sms-item p-2');
-                const header = $('<div>').addClass('d-flex justify-content-between');
-                header.append($('<strong>').text(sms.phone));
+                div.attr('data-phone', sms.phone || '');
+                div.attr('data-content', sms.content || '');
+                div.attr('data-time', time);
+                div.attr('data-iccid', sms.iccid || '');
+                div.attr('data-type', sms.type || 'received');
+
+                const header = $('<div>').addClass('d-flex justify-content-between align-items-center');
+                const leftSide = $('<div>').addClass('d-flex align-items-center gap-2');
+                leftSide.append($('<i>').addClass(`bi ${icon} text-secondary`));
+                leftSide.append($('<strong>').text(sms.phone || 'Unknown'));
+                leftSide.append($('<span>').addClass(badgeClass).text(badgeText));
+                header.append(leftSide);
                 header.append($('<small>').addClass('text-muted').text(time));
 
-                const contentDiv = $('<div>').addClass('mb-1').text(sms.content); // Safer .text()
+                const contentDiv = $('<div>').addClass('mb-1 sms-content-preview').text(sms.content || '');
 
                 const footer = $('<small>').addClass('text-secondary').html(`<i class="bi bi-sim"></i> ${getFlagFromICCID(sms.iccid)} ${sms.iccid}`);
 
                 div.append(header).append(contentDiv).append(footer);
+
+                div.on('click', function() {
+                    const btn = $(this);
+                    $('#sms-detail-phone').text(btn.data('phone') || 'Unknown');
+                    $('#sms-detail-time').text(btn.data('time'));
+                    $('#sms-detail-content').text(btn.data('content'));
+                    $('#sms-detail-iccid').html(`<i class="bi bi-sim"></i> ${getFlagFromICCID(btn.data('iccid'))} ${btn.data('iccid')}`);
+                    const type = btn.data('type');
+                    const badge = type === 'sent'
+                        ? '<span class="sms-badge-sent">Sent</span>'
+                        : '<span class="sms-badge-received">Received</span>';
+                    $('#sms-detail-badge').html(badge);
+                    new bootstrap.Modal('#smsDetailModal').show();
+                });
+
                 list.append(div);
             });
         }
