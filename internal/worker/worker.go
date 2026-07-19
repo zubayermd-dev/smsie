@@ -544,6 +544,7 @@ func (w *ModemWorker) initModem() {
 			// After registration, check for any pending SMS on SIM
 			go func() {
 				time.Sleep(2 * time.Second) // Wait for workers to be ready
+				logger.Log.Infof("[%s] Running checkPendingSMS...", w.PortName)
 				w.checkPendingSMS()
 			}()
 		}

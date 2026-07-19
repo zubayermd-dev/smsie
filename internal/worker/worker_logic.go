@@ -279,45 +279,28 @@ func (w *ModemWorker) processPDU(raw string) {
 	w.processPDUWithIndex(raw, 0)
 }
 
-// checkPendingSMS checks for any unread messages on SIM after modem registration
-// Only runs on the registered primary worker to avoid duplicates
+// checkPendingSMS cleans SIM on startup — SIM should always be empty
+// Messages live in the database, not on SIM
 func (w *ModemWorker) checkPendingSMS() {
+	logger.Log.Infof("[%s] checkPendingSMS called", w.PortName)
 	// Only run on the registered worker for this ICCID
-	if w.getModem() == nil || !w.manager.IsRegisteredWorker(w.PortName, w.getModem().ICCID) {
+	if w.getModem() == nil {
+		logger.Log.Warnf("[%s] checkPendingSMS: modem is nil", w.PortName)
+		return
+	}
+	if !w.manager.IsRegisteredWorker(w.PortName, w.getModem().ICCID) {
+		logger.Log.Warnf("[%s] checkPendingSMS: not registered worker for %s", w.PortName, w.getModem().ICCID)
 		return
 	}
 
 	w.SetBusy(true)
 	defer w.SetBusy(false)
 
-	resp, err := w.ExecuteAT("AT+CMGL=4", 10*time.Second)
-	if err != nil {
-		logger.Log.Warnf("[%s] Failed to check pending SMS: %v", w.PortName, err)
-		return
-	}
-	if strings.TrimSpace(resp) == "OK" {
-		return // No messages
-	}
-
-	lines := strings.Split(resp, "\n")
-	var count int
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "+CMGL:") {
-			parts := strings.SplitN(line, ",", 2)
-			if len(parts) >= 1 {
-				idxStr := strings.TrimPrefix(parts[0], "+CMGL:")
-				idxStr = strings.TrimSpace(idxStr)
-				if idx, err := strconv.Atoi(idxStr); err == nil {
-					count++
-					logger.Log.Infof("[%s] Found pending SMS at index %d", w.PortName, idx)
-					go w.readAndProcessSMS(idx)
-				}
-			}
-		}
-	}
-	if count > 0 {
-		logger.Log.Infof("[%s] Processing %d pending SMS from SIM", w.PortName, count)
+	// Delete ALL messages from SIM — they should only exist in database
+	if _, err := w.ExecuteAT("AT+CMGD=1,4", 5*time.Second); err != nil {
+		logger.Log.Warnf("[%s] Failed to cleanup SIM: %v", w.PortName, err)
+	} else {
+		logger.Log.Infof("[%s] SIM cleaned on startup", w.PortName)
 	}
 }
 
