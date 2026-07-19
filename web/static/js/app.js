@@ -315,6 +315,18 @@ $(document).ready(function () {
         $(this).html(isDark ? '<i class="bi bi-moon"></i>' : '<i class="bi bi-sun"></i>');
     });
 
+    $('#btn-logout').click(function() {
+        localStorage.removeItem('ivy_username');
+        localStorage.removeItem('ivy_token');
+        localStorage.removeItem('ivy_role');
+        auth = {};
+        if (smsAutoRefreshInterval) {
+            clearInterval(smsAutoRefreshInterval);
+            smsAutoRefreshInterval = null;
+        }
+        checkAuth();
+    });
+
     checkAuth();
 
     // Event Listeners
